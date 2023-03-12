@@ -15,7 +15,7 @@
             wait: true
             timeout: 7200
           register: __jobid
-          loop: "{{ role_names }}"
+          loop: "{{ role_name }}"
 
         - name: Debug
           ansible.builtin.debug:
@@ -24,12 +24,12 @@
             - "{{ awx_hostname }}"
             - "{{ awx_username }}"
             - "{{ awx_password }}"
-            - "{{ role_names }}"
+            - "{{ role_name }}"
 
         - name: Job status
           ansible.builtin.debug:
             msg: "Role name: {{ item }}, job_id {{ __jobid.results[__idx] }}"
-          loop: "{{ role_names }}"
+          loop: "{{ role_name }}"
           loop_control:
             index_var: __idx
 
