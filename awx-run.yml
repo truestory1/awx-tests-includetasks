@@ -19,7 +19,11 @@
 
         - name: Debug
           ansible.builtin.debug:
-            var: awx_password
+            var: "{{item}}"
+          loop:
+            - "{{ awx_hostname }}"
+            - "{{ awx_username }}"
+            - "{{ awx_password }}"
 
         - name: Job status
           ansible.builtin.debug:
