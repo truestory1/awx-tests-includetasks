@@ -20,7 +20,7 @@
         - name: Job status
           ansible.builtin.debug:
             msg: "Role name: {{ item }}, job_id {{ __jobid.results[__idx] }}"
-          loop: "{{ role_name }}"
+          loop: "{{ role_names }}"
           loop_control:
             index_var: __idx
 
