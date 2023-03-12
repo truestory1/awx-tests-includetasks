@@ -17,6 +17,10 @@
           register: __jobid
           loop: "{{ role_names }}"
 
+        - name: Debug
+          ansible.builtin.debug:
+            var: role_names
+
         - name: Job status
           ansible.builtin.debug:
             msg: "Role name: {{ item }}, job_id {{ __jobid.results[__idx] }}"
