@@ -24,6 +24,7 @@
             - "{{ awx_hostname }}"
             - "{{ awx_username }}"
             - "{{ awx_password }}"
+            - "{{ role_names }}"
 
         - name: Job status
           ansible.builtin.debug:
