@@ -1,0 +1,30 @@
+---
+- name: Test role with AWX
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: AWX
+      block:
+        - name: Include roles
+          awx.awx.job_launch:
+            name: "{{ item }}"
+            controller_host: "{{ awx_hostname }}"
+            controller_username: "{{ awx_username }}"
+            controller_password: "{{ awx_password }}"
+            validate_certs: false
+            wait: true
+            timeout: 7200
+          register: __jobid
+          loop: "{{ role_name }}"
+
+        - name: Job status
+          ansible.builtin.debug:
+            msg: "Role name: {{ item }}, job_id {{ __jobid.results[__idx] }}"
+          loop: "{{ role_name }}"
+          loop_control:
+            index_var: __idx
+
+      always:
+        - name: Cleanup steps
+          ansible.builtin.debug:
+            msg: "Cleanup steps"
