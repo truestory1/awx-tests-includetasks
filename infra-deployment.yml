@@ -1,0 +1,140 @@
+---
+- name: AWX deployment
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Configure helm repo
+      kubernetes.core.helm_repository:
+        name: stable
+        repo_url: "https://ansible.github.io/awx-operator"
+
+    - name: Deploy AWX operator
+      kubernetes.core.helm:
+        name: awx-operator
+        chart_ref: awx-operator/awx-operator
+        chart_version: 1.3.0
+        release_namespace: awx
+        create_namespace: true
+
+    - name: Create AWX deployment
+      kubernetes.core.k8s:
+        name: awx-demo
+        namespace: awx
+        state: present
+        definition:
+          apiVersion: awx.ansible.com/v1beta1
+          kind: AWX
+          spec:
+            service_type: nodeport
+
+    - name: Get AWX service port
+      kubernetes.core.k8s_info:
+        kind: Service
+        namespace: awx
+        name: awx-demo-service
+        wait: true
+      register: __awx_details
+
+    - name: Set awx port
+      ansible.builtin.set_fact:
+        __awx_port: "{{ __awx_details.resources[0].spec.ports[0].nodePort }}"
+
+    - name: Get AWX service hostname
+      kubernetes.core.k8s_info:
+        kind: Node
+        namespace: awx
+        wait: true
+      register: __awx_details
+
+    - name: Set awx hostname
+      ansible.builtin.set_fact:
+        __awx_hostname: "{{ __awx_details.resources[0].status.addresses[0].address }}"
+
+    - name: Set awx url
+      ansible.builtin.set_fact:
+        __awx_url: "http://{{ __awx_hostname }}:{{ __awx_port }}"
+
+    - name: Wait until AWX is available
+      ansible.builtin.uri:
+        url: "{{ __awx_url }}"
+      register: __result
+      until: __result.status == 200
+      delay: 10
+      retries: 100
+
+    - name: Get secret - awx password
+      kubernetes.core.k8s_info:
+        kind: secret
+        namespace: awx
+        wait: true
+        name: awx-demo-admin-password
+      register: __awx_details
+
+    - name: Set var admin username
+      ansible.builtin.set_fact:
+        __awx_username: "admin"
+
+    - name: Set var admin password
+      ansible.builtin.set_fact:
+        __awx_password: "{{ __awx_details.resources[0].data.password | b64decode }}"
+
+    - name: Provide details
+      ansible.builtin.debug:
+        msg: "URL: {{ __awx_url }} , login: admin, password: {{ __awx_password }}"
+
+    - name: Delete default Demo Template
+      awx.awx.job_template:
+        name: Demo Job Template
+        state: absent
+        controller_username: "{{ __awx_username }}"
+        controller_password: "{{ __awx_password }}"
+        controller_host: "{{ __awx_url }}"
+
+    - name: Delete default Demo project
+      awx.awx.project:
+        name: Demo Project
+        controller_username: "{{ __awx_username }}"
+        controller_password: "{{ __awx_password }}"
+        controller_host: "{{ __awx_url }}"
+        organization: Default
+        state: absent
+
+    - name: Register AWX Demo project
+      awx.awx.project:
+        name: AWX Demo
+        controller_username: "{{ __awx_username }}"
+        controller_password: "{{ __awx_password }}"
+        controller_host: "{{ __awx_url }}"
+        organization: Default
+        scm_type: git
+        scm_update_on_launch: true
+        scm_url: http://github.com/truestory1/awx-tests-includetasks.git
+
+    - name: Register hello world jobtemplate
+      awx.awx.job_template:
+        name: Hello World Demo
+        controller_username: "{{ __awx_username }}"
+        controller_password: "{{ __awx_password }}"
+        controller_host: "{{ __awx_url }}"
+        organization: Default
+        inventory: "Demo Inventory"
+        project: "AWX Demo"
+        playbook: hello-world.yml
+
+    - name: Register AWX Demo jobtemplate
+      awx.awx.job_template:
+        name: AWX Demo
+        controller_username: "{{ __awx_username }}"
+        controller_password: "{{ __awx_password }}"
+        controller_host: "{{ __awx_url }}"
+        organization: Default
+        inventory: "Demo Inventory"
+        project: "AWX Demo"
+        playbook: awx-run.yml
+        extra_vars:
+          role_name:
+            - Hello World Demo
+          awx_hostname: "{{ __awx_url }}"
+          awx_username: "{{ __awx_username }}"
+          awx_password: "{{ __awx_password }}"
