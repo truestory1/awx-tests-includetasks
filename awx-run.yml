@@ -19,7 +19,7 @@
 
         - name: Debug
           ansible.builtin.debug:
-            var: role_names
+            var: awx_password
 
         - name: Job status
           ansible.builtin.debug:
