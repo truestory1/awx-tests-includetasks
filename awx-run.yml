@@ -15,7 +15,7 @@
             wait: true
             timeout: 7200
           register: __jobid
-          loop: "{{ role_name }}"
+          loop: "{{ role_names }}"
 
         - name: Job status
           ansible.builtin.debug:
