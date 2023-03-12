@@ -19,7 +19,7 @@
 
         - name: Debug
           ansible.builtin.debug:
-            var: "{{item}}"
+            var: item
           loop:
             - "{{ awx_hostname }}"
             - "{{ awx_username }}"
