@@ -3,6 +3,9 @@
   hosts: localhost
   gather_facts: false
   connection: local
+  vars:
+    awx_deploymentname: awx01
+    awx_username: admin
   tasks:
     - name: Configure helm repo
       kubernetes.core.helm_repository:
@@ -19,20 +22,20 @@
 
     - name: Create AWX deployment
       kubernetes.core.k8s:
-        name: awx-demo
+        name: "{{ awx_deploymentname }}"
         namespace: awx
         state: present
         definition:
           apiVersion: awx.ansible.com/v1beta1
           kind: AWX
           spec:
-            service_type: nodeport
+            service_type: NodePort
 
     - name: Get AWX service port
       kubernetes.core.k8s_info:
         kind: Service
         namespace: awx
-        name: awx-demo-service
+        name: "{{ awx_deploymentname }}-service"
         wait: true
       register: __awx_details
 
@@ -68,44 +71,37 @@
         kind: secret
         namespace: awx
         wait: true
-        name: awx-demo-admin-password
+        name: "{{ awx_deploymentname }}-{{ awx_username }}-password"
       register: __awx_details
-
-    - name: Set var admin username
-      ansible.builtin.set_fact:
-        __awx_username: "admin"
 
     - name: Set var admin password
       ansible.builtin.set_fact:
         __awx_password: "{{ __awx_details.resources[0].data.password | b64decode }}"
 
-    - name: Provide details
-      ansible.builtin.debug:
-        msg: "URL: {{ __awx_url }} , login: admin, password: {{ __awx_password }}"
+    - name: Set AWX credentials as a variable
+      ansible.builtin.set_fact:
+        __awx_credentials: &__awx_credentials
+          controller_username: "{{ awx_username }}"
+          controller_password: "{{ __awx_password }}"
+          controller_host: "{{ __awx_url }}"
 
     - name: Delete default Demo Template
       awx.awx.job_template:
         name: Demo Job Template
         state: absent
-        controller_username: "{{ __awx_username }}"
-        controller_password: "{{ __awx_password }}"
-        controller_host: "{{ __awx_url }}"
+        <<: *__awx_credentials
 
     - name: Delete default Demo project
       awx.awx.project:
         name: Demo Project
-        controller_username: "{{ __awx_username }}"
-        controller_password: "{{ __awx_password }}"
-        controller_host: "{{ __awx_url }}"
+        <<: *__awx_credentials
         organization: Default
         state: absent
 
     - name: Register AWX Demo project
       awx.awx.project:
         name: AWX Demo
-        controller_username: "{{ __awx_username }}"
-        controller_password: "{{ __awx_password }}"
-        controller_host: "{{ __awx_url }}"
+        <<: *__awx_credentials
         organization: Default
         scm_type: git
         scm_update_on_launch: true
@@ -114,9 +110,7 @@
     - name: Register hello world jobtemplate
       awx.awx.job_template:
         name: Hello World Demo
-        controller_username: "{{ __awx_username }}"
-        controller_password: "{{ __awx_password }}"
-        controller_host: "{{ __awx_url }}"
+        <<: *__awx_credentials
         organization: Default
         inventory: "Demo Inventory"
         project: "AWX Demo"
@@ -125,9 +119,7 @@
     - name: Register AWX Demo jobtemplate
       awx.awx.job_template:
         name: AWX Demo
-        controller_username: "{{ __awx_username }}"
-        controller_password: "{{ __awx_password }}"
-        controller_host: "{{ __awx_url }}"
+        <<: *__awx_credentials
         organization: Default
         inventory: "Demo Inventory"
         project: "AWX Demo"
@@ -136,5 +128,9 @@
           role_name:
             - Hello World Demo
           awx_hostname: "{{ __awx_url }}"
-          awx_username: "{{ __awx_username }}"
+          awx_username: "{{ awx_username }}"
           awx_password: "{{ __awx_password }}"
+
+    - name: Provide details
+      ansible.builtin.debug:
+        msg: "URL: {{ __awx_url }} , login: {{ awx_username }}, password: {{ __awx_password }}"
